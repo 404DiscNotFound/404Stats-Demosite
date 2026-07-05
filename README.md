@@ -73,79 +73,12 @@ Also includes **2 projects** (Stone Castle, Wheat Farm) with contributors, timel
 
 ---
 
-## Deployment
-
-### Netlify (recommended)
-
-1. Drag this folder onto [app.netlify.com](https://app.netlify.com)
-2. The `_redirects` file handles SPA routing automatically
-3. Done — your site is live
-
-### GitHub Pages
-
-```bash
-git push origin main
-# Enable Pages in repo settings → branch: main, folder: / (root)
-```
-
-Note: GitHub Pages needs a `404.html` identical to `index.html` for SPA routing. Copy `index.html` to `404.html`:
-
-```bash
-cp index.html 404.html
-```
-
-### Any static host
-
-Upload all files and folders to your web root. Configure your server to serve `index.html` for all paths (SPA fallback):
-
-**nginx:**
-```nginx
-location / {
-    try_files $uri $uri/ /index.html;
-}
-```
-
-**Apache (.htaccess):**
-```apache
-RewriteEngine On
-RewriteBase /
-RewriteRule ^index\.html$ - [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]
-```
-
----
-
-## Local Development
-
-```bash
-cd 404Stats-Demosite
-python3 -m http.server 8080
-# Open http://localhost:8080
-```
-
----
-
-## Regenerating Demo Data
-
-The demo data was generated with `generate_demo_data.py`. To regenerate:
-
-```bash
-python3 generate_demo_data.py
-```
-
-This creates/updates 98 JSON files in `demo-data/` with realistic, consistent statistics across all 15 players, 3 worlds, and 2 projects.
-
----
-
 ## Related Projects
 
 | Project | Link |
 | :--- | :--- |
-| 404Stats Plugin | [github.com/404DiscNotFound/404Stats](https://github.com/404DiscNotFound/404Stats) |
+| 404Stats Plugin | Closed Source at the moment |
 | Project Website | [mcstats.404gnf.de](https://mcstats.404gnf.de) |
-| Community | [404gnf.de](https://404gnf.de) |
 
 ---
 
