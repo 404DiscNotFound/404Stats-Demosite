@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>404Stats Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"><img src="logo-404.svg" alt="404Stats logo" /></div>
+      <div><h1 id="serverName">404Stats Demo</h1><p id="serverPath">/server/local</p></div>
+    </div>
+    <div class="top-actions"><button class="ghost" id="refreshBtn">Refresh</button><button class="ghost" id="aboutBtn">About</button><span class="alpha-badge demo" title="Demo mode — static data, no real server behind this.">⚡ Demo 0.1a</span><a class="pill" href="https://mcstats.404gnf.de" target="_blank" rel="noopener noreferrer">404Stats</a></div>
+  </header>
+  <main class="page" id="app"></main>
+  <div class="toast" id="toast"></div>
+  <script src="demo.js"></script>
+</body>
+</html>
