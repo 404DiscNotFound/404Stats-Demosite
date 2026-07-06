@@ -1096,7 +1096,7 @@ function loadAbout() {
     ${assetNotice()}
     <section class="about-hero panel">
       <div class="about-logo"><img src="/logo-404.svg" alt="404Stats logo" /></div>
-      <div><span class="login-kicker">404Stats v0.1a Alpha — Demo Mode</span><h2>Local Minecraft statistics for blocks, combat, movement, production, interactions and worlds.</h2><p>This is a static demo of 404Stats. No real server — all stats are pre-generated. 404Stats is a non-profit plugin built for server owners who want useful statistics without external dashboards or browser hotlinks.</p><div class="about-chip-row"><span>Static Demo</span><span>Local H2 storage</span><span>Internal web panel</span><span>Privacy friendly assets</span><span>Alpha — bugs possible</span></div></div>
+      <div><span class="login-kicker">404Stats v0.2.1a Alpha — Demo Mode</span><h2>Local Minecraft statistics for blocks, combat, movement, production, interactions and worlds.</h2><p>This is a static demo of 404Stats. No real server — all stats are pre-generated. 404Stats is a non-profit plugin built for server owners who want useful statistics without external dashboards or browser hotlinks.</p><div class="about-chip-row"><span>Static Demo</span><span>Local H2 storage</span><span>Internal web panel</span><span>Privacy friendly assets</span><span>Alpha — bugs possible</span></div></div>
     </section>
     <section class="about-feature-grid">
       <article class="panel"><h2>Modules</h2><p>The server landing page groups stats into modules. Blocks, NPC Combat and Movement each have dedicated dashboards, rankings and player views.</p></article>
