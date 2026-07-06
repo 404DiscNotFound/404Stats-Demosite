@@ -2,7 +2,7 @@
 
 > Static demo of the 404Stats Minecraft statistics plugin — pre-generated data, no server needed.
 
-**[demo.404gnf.de](https://demo.404gnf.de)** (coming soon)
+**[demo.404gnf.de](https://demo.404gnf.de)**
 
 ---
 
@@ -77,7 +77,7 @@ Also includes **2 projects** (Stone Castle, Wheat Farm) with contributors, timel
 
 | Project | Link |
 | :--- | :--- |
-| 404Stats Plugin | Closed Source at the moment |
+| 404Stats Plugin | Closed Source until beta state |
 | Project Website | [mcstats.404gnf.de](https://mcstats.404gnf.de) |
 
 ---
