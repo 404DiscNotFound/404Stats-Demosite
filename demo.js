@@ -1,13 +1,5 @@
 console.log('404Stats Local app blockindex-1 loaded');
 
-window.onerror = function(msg, url, line, col, error) {
-  const app = document.getElementById('app');
-  if (app) {
-    app.innerHTML = '<section class="panel error-panel"><h2>JS Error</h2><p>' + msg + '</p><p><small>Line ' + line + ':' + col + '</small></p></section>';
-  }
-  return false;
-};
-
 const $ = (id) => document.getElementById(id);
 const app = () => $('app');
 let currentMode = 'SURVIVAL';
@@ -22,12 +14,13 @@ let moveSearchTimer = null;
 let prodSearchTimer = null;
 let currentInteractGroup = 'ALL';
 let interactSearchTimer = null;
-const colors = ['#3eea7c', '#00f5ff', '#ff006e', '#ffd166', '#a78bfa', '#f97316'];
+const APP_VERSION = '0.3a';
+const colors = ['#5BA033', '#3BAA90', '#C0392B', '#D4A017', '#8B4FE8', '#6A7A8A'];
 let assetStatus = { minecraftAssetsEnabled: true, iconMode: 'textures' };
 
 async function post(url, payload = {}) {
   const file = demoRoute(url, payload) || 'ping.json';
-  const response = await fetch('/demo-data/' + file);
+  const response = await fetch('demo-data/' + file);
   if (!response.ok) throw new Error('Demo data not found: ' + file);
   const text = await response.text();
   let json;
@@ -42,7 +35,7 @@ function demoRoute(url, payload = {}) {
     return 'getServerData_' + mode + '.json';
   }
   if (url.includes('getPlayerData')) {
-    const key = payload.uuid || payload.player || payload.player_name || '';
+    const key = payload.uuid || payload.player || '';
     if (key) return 'getPlayerData_' + key + '.json';
     return 'getPlayerData_550e8400-e29b-41d4-a716-446655440001.json';
   }
@@ -162,6 +155,8 @@ function tone(mode) { return mode === 'CREATIVE' ? 'creative' : mode === 'ALL' ?
 function header(name, path) {
   $('serverName').textContent = name || '404Stats Local';
   $('serverPath').textContent = path || '/server/local';
+  const badge = $('versionBadge');
+  if (badge) badge.textContent = APP_VERSION;
 }
 function toast(message) {
   const t = $('toast');
@@ -182,7 +177,16 @@ function assetNotice() {
   return `<section class="asset-notice"><strong>Emoji block icons active</strong><span>Minecraft texture icons are disabled in <code>config.yml</code>. 404Stats is using privacy- and license-friendly emoji icons instead.</span></section>`;
 }
 async function checkAuthAndLoad() {
-  load();
+  try {
+    const status = await post('/api/functions/getLocalAuthStatus');
+    if (status.password_required && !status.authenticated) {
+      renderLogin();
+      return;
+    }
+    load();
+  } catch (e) {
+    load();
+  }
 }
 function renderLogin(error = '') {
   header('404Stats Local', '/server/local');
@@ -381,9 +385,18 @@ async function loadLanding() {
     const interactionSummary = interactionData?.summary || {};
     header(serverName, '/server/local');
     app().innerHTML = `
-      <section class="landing-hero panel">
-        <div class="server-icon-wrap"><img src="/server-icon.png" alt="${attr(serverName)} server icon" /></div>
-        <div><span class="login-kicker">404Stats Server</span><h2>${esc(serverName)}</h2><p>Choose a module for your local server statistics. Blocks covers building activity, NPC Combat shows kills, deaths, rankings and more, Movement tracks walking, flying, riding and jumping.</p></div>
+      <section class="telemetry-hero">
+        <div class="hero-icon-wrap"><img src="/server-icon.png" alt="${attr(serverName)} server icon" onerror="this.parentElement.classList.add('fallback')" /></div>
+        <div class="hero-content">
+          <span class="hero-badge">Multiplayer Statistics</span>
+          <h1 class="hero-title">${esc(serverName)}</h1>
+          <p class="hero-sub">Select a stats menu for this local Minecraft server.</p>
+          <div class="hero-quick-stats">
+            ${moduleStatus.blocks ? `<span class="hero-stat"><b>${esc(fmt(survival?.summary?.total || all?.summary?.total || 0))}</b><i>blocks</i></span>` : ''}
+            ${moduleStatus.npc_combat ? `<span class="hero-stat"><b>${esc(fmt(combatSummary.kills || 0))}</b><i>kills</i></span>` : ''}
+            ${formatModList()}
+          </div>
+        </div>
       </section>
       ${assetNotice()}
       <section class="module-grid">
@@ -401,51 +414,64 @@ async function loadLanding() {
   }
 }
 
+function formatModList() {
+  const active = [];
+  if (moduleStatus.blocks) active.push('Blocks');
+  if (moduleStatus.npc_combat) active.push('Combat');
+  if (moduleStatus.movement) active.push('Movement');
+  if (moduleStatus.production) active.push('Production');
+  if (moduleStatus.interactions) active.push('Interact');
+  if (moduleStatus.worlds) active.push('Worlds');
+  if (active.length === 0) return '<span class="hero-stat"><i>no modules</i></span>';
+  if (active.length <= 4) return active.map(m => `<span class="hero-stat"><i>${esc(m)}</i></span>`).join('');
+  return `<span class="hero-stat"><i>${active.length} modules active</i></span>`;
+}
+
 function cardBlock(survival, creative, all) {
   return `<button class="module-card blocks-module" onclick="goBlocks()">
-    <div class="module-top"><span class="module-icon">⛏</span><div><strong>Blocks</strong><small>Survival, Creative and All block activity</small></div></div>
-    <div class="module-stats three">${blockModeSummary('Survival', survival?.summary)}${blockModeSummary('Creative', creative?.summary)}${blockModeSummary('All', all?.summary)}</div>
-    <span class="module-action">Open Blocks section →</span>
+    <div class="module-top"><span class="module-icon">⛏</span><div><strong>Blocks</strong><small>Mined, placed, players and block index</small></div></div>
+    <div class="module-stats three">${blockModeSummary('SURV', survival?.summary)}${blockModeSummary('CREA', creative?.summary)}${blockModeSummary('ALL', all?.summary)}</div>
+    <span class="module-action">Open block menu →</span>
   </button>`;
 }
 
 function cardCombat(summary) {
   return `<button class="module-card combat-module" onclick="goNpcs()">
-    <div class="module-top"><span class="module-icon">⚔</span><div><strong>NPC Combat</strong><small>Kills, deaths, rankings, worlds and weapons</small></div></div>
-    <div class="module-stats two"><div><span>Kills</span><b>${fmt(summary.kills || 0)}</b></div><div><span>Deaths</span><b>${fmt(summary.deaths || 0)}</b></div></div>
-    <span class="module-action">Open NPC Combat section →</span>
+    <div class="module-top"><span class="module-icon">⚔</span><div><strong>NPC Combat</strong><small>Kills, deaths, mobs, worlds and weapons</small></div></div>
+    <div class="module-stats two"><div><span>KILLS</span><b>${fmt(summary.kills || 0)}</b></div><div><span>DEATHS</span><b>${fmt(summary.deaths || 0)}</b></div></div>
+    <span class="module-action">Open combat menu →</span>
   </button>`;
 }
 
 function cardMovement(walkDist, flyDist, jumpsVal) {
   return `<button class="module-card movement-module" onclick="goMovement()">
-    <div class="module-top"><span class="module-icon">👟</span><div><strong>Movement</strong><small>Walking, flying, riding, jumping and more</small></div></div>
-    <div class="module-stats three"><div><span>Walk Dist</span><b>${fmtDistItem(walkDist)}</b></div><div><span>Fly Dist</span><b>${fmtDistItem(flyDist)}</b></div><div><span>Jumps</span><b>${fmt(jumpsVal)}</b></div></div>
-    <span class="module-action">Open Movement section →</span>
+    <div class="module-top"><span class="module-icon">👟</span><div><strong>Movement</strong><small>Walk, fly, ride and jump statistics</small></div></div>
+    <div class="module-stats three"><div><span>WALK</span><b>${fmtDistItem(walkDist)}</b></div><div><span>FLY</span><b>${fmtDistItem(flyDist)}</b></div><div><span>JUMPS</span><b>${fmt(jumpsVal)}</b></div></div>
+    <span class="module-action">Open movement menu →</span>
   </button>`;
 }
 
 function cardProduction(summary) {
   return `<button class="module-card production-module" onclick="goProduction()">
-    <div class="module-top"><span class="module-icon">🏭</span><div><strong>Production</strong><small>Crafting, smelting, smithing and stonecutting</small></div></div>
-    <div class="module-stats three"><div><span>Produced</span><b>${fmt(summary.total_amount || 0)}</b></div><div><span>Actions</span><b>${fmt(summary.total_actions || 0)}</b></div><div><span>Items</span><b>${fmt(summary.unique_items || 0)}</b></div></div>
-    <span class="module-action">Open Production section →</span>
+    <div class="module-top"><span class="module-icon">🏭</span><div><strong>Production</strong><small>Crafting, smelting, smithing, stonecutting</small></div></div>
+    <div class="module-stats three"><div><span>MADE</span><b>${fmt(summary.total_amount || 0)}</b></div><div><span>ACTIONS</span><b>${fmt(summary.total_actions || 0)}</b></div><div><span>ITEMS</span><b>${fmt(summary.unique_items || 0)}</b></div></div>
+    <span class="module-action">Open production menu →</span>
   </button>`;
 }
 
 function cardInteractions(summary) {
   return `<button class="module-card interactions-module" onclick="goInteractions()">
-    <div class="module-top"><span class="module-icon">🔗</span><div><strong>Interactions</strong><small>Containers, doors, bells, animals and usable blocks</small></div></div>
-    <div class="module-stats three"><div><span>Actions</span><b>${fmt(summary.actions || 0)}</b></div><div><span>Types</span><b>${fmt(summary.unique_types || 0)}</b></div><div><span>Players</span><b>${fmt(summary.players || 0)}</b></div></div>
-    <span class="module-action">Open Interactions section →</span>
+    <div class="module-top"><span class="module-icon">🔗</span><div><strong>Interactions</strong><small>Chests, doors, bells, animals, buckets</small></div></div>
+    <div class="module-stats three"><div><span>ACTIONS</span><b>${fmt(summary.actions || 0)}</b></div><div><span>TYPES</span><b>${fmt(summary.unique_types || 0)}</b></div><div><span>PLAYERS</span><b>${fmt(summary.players || 0)}</b></div></div>
+    <span class="module-action">Open interaction menu →</span>
   </button>`;
 }
 
 function cardWorlds(dims) {
   return `<button class="module-card worlds-module" onclick="goWorlds()">
-    <div class="module-top"><span class="module-icon">🌍</span><div><strong>Worlds</strong><small>Server worlds and dimension overview</small></div></div>
-    <div class="module-stats three"><div><span>Overworld</span><b>${fmt(dims.overworld || 0)}</b></div><div><span>Nether</span><b>${fmt(dims.nether || 0)}</b></div><div><span>The End</span><b>${fmt(dims.the_end || 0)}</b></div></div>
-    <span class="module-action">Open Worlds section →</span>
+    <div class="module-top"><span class="module-icon">🌍</span><div><strong>Worlds</strong><small>Dimensions and world activity overview</small></div></div>
+    <div class="module-stats three"><div><span>OVER</span><b>${fmt(dims.overworld || 0)}</b></div><div><span>NETHER</span><b>${fmt(dims.nether || 0)}</b></div><div><span>END</span><b>${fmt(dims.the_end || 0)}</b></div></div>
+    <span class="module-action">Open worlds menu →</span>
   </button>`;
 }
 
@@ -473,7 +499,7 @@ async function loadBlockStats() {
     bindMode(loadBlockStats);
     renderDonut('categoryDonut', 'categoryLegend', data.material_categories || [], 'name');
     renderDonut('worldDonut', 'worldLegend', data.world_distribution || [], 'display_name');
-    renderFacts(data.fun_facts || []);
+    renderFacts(Number(s.total || 0) > 0 ? data.fun_facts || [] : []);
     renderTrend(data.trend || []);
     renderBlocks(data.top_blocks || []);
     renderPlayers('topMiners', data.top_miners || [], 'mined');
@@ -1096,7 +1122,7 @@ function loadAbout() {
     ${assetNotice()}
     <section class="about-hero panel">
       <div class="about-logo"><img src="/logo-404.svg" alt="404Stats logo" /></div>
-      <div><span class="login-kicker">404Stats v0.2.1a Alpha — Demo Mode</span><h2>Local Minecraft statistics for blocks, combat, movement, production, interactions and worlds.</h2><p>This is a static demo of 404Stats. No real server — all stats are pre-generated. 404Stats is a non-profit plugin built for server owners who want useful statistics without external dashboards or browser hotlinks.</p><div class="about-chip-row"><span>Static Demo</span><span>Local H2 storage</span><span>Internal web panel</span><span>Privacy friendly assets</span><span>Alpha — bugs possible</span></div></div>
+      <div><span class="login-kicker">404Stats v${APP_VERSION}</span><h2>Local Minecraft statistics for blocks, combat, movement, production, interactions and worlds.</h2><p>404Stats is a non-profit plugin built for server owners who want useful statistics without external dashboards or browser hotlinks.</p><div class="about-chip-row"><span>Local H2 storage</span><span>Internal web panel</span><span>Privacy friendly assets</span><span>Alpha — bugs possible</span></div></div>
     </section>
     <section class="about-feature-grid">
       <article class="panel"><h2>Modules</h2><p>The server landing page groups stats into modules. Blocks, NPC Combat and Movement each have dedicated dashboards, rankings and player views.</p></article>
@@ -1394,26 +1420,69 @@ function bindBlockIndexSearch() {
 function renderDonut(donutId, legendId, rows, labelKey) {
   const d = $(donutId), l = $(legendId);
   if (!d || !l) return;
-  if (!rows.length) {
-    d.style.background = 'conic-gradient(rgba(255,255,255,0.08) 0 100%)';
-    l.innerHTML = '<div class="legend-row"><span class="legend-label">No data yet</span><strong>0%</strong></div>';
+  const sourceRows = rows || [];
+  const totalValue = sourceRows.reduce((sum, row) => sum + chartValue(row), 0);
+  const segments = sourceRows.map((row, i) => {
+    const pct = Number(row.percent || 0);
+    const fallbackPct = totalValue > 0 ? (chartValue(row) / totalValue) * 100 : 0;
+    return {
+      row,
+      color: colors[i % colors.length],
+      label: row[labelKey] || row.name || 'Unknown',
+      percent: Math.max(0, pct > 0 ? pct : fallbackPct)
+    };
+  }).filter(seg => seg.percent > 0).sort((a, b) => b.percent - a.percent);
+  if (!segments.length) {
+    d.className = 'donut empty-chart';
+    d.innerHTML = '<div class="empty-chart-icon">?</div><div class="empty-chart-label">No data yet</div>';
+    l.innerHTML = '<div class="legend-row"><span class="legend-label">No data recorded</span><strong>0%</strong></div>';
     return;
   }
-  let start = 0;
-  d.style.background = 'conic-gradient(' + rows.map((row, i) => {
-    const pct = Number(row.percent || 0);
-    const end = start + pct;
-    const seg = `${colors[i % colors.length]} ${start}% ${end}%`;
-    start = end;
-    return seg;
-  }).join(', ') + ')';
-  l.innerHTML = rows.map((row, i) => `<div class="legend-row"><span class="legend-label"><span class="swatch" style="background:${colors[i % colors.length]}"></span>${esc(row[labelKey] || row.name || 'Unknown')}</span><strong>${Number(row.percent || 0).toFixed((row.percent || 0) % 1 ? 1 : 0)}%</strong></div>`).join('');
+  d.className = 'donut quad-donut';
+
+  const GRID = 8, HOLE = 4;
+  const totalCells = GRID * GRID - HOLE * HOLE;
+  const holeStart = (GRID - HOLE) / 2;
+  const cells = [];
+  let segIdx = 0;
+  let cellCount = 0;
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const inHole = x >= holeStart && x < holeStart + HOLE && y >= holeStart && y < holeStart + HOLE;
+      if (inHole) {
+        cells.push('<span class="quad-donut-cell hole"></span>');
+        continue;
+      }
+      const target = segments.length
+        ? Math.round((segments.slice(0, segIdx + 1).reduce((s, seg) => s + seg.percent, 0) / 100) * totalCells)
+        : 0;
+      if (cellCount >= target && segIdx < segments.length - 1) segIdx++;
+      const seg = segments[Math.min(segIdx, segments.length - 1)];
+      cells.push(`<span class="quad-donut-cell fill" style="background:${seg.color}" title="${attr(seg.label)} · ${formatPercent(seg.percent)}"></span>`);
+      cellCount++;
+    }
+  }
+  d.innerHTML = cells.join('');
+  l.innerHTML = segments.map(seg => `<div class="legend-row"><span class="legend-label"><span class="swatch" style="background:${seg.color}"></span>${esc(seg.label)}</span><strong>${formatPercent(seg.percent)}</strong></div>`).join('');
+}
+
+function formatPercent(value = 0) {
+  const pct = Number(value || 0);
+  return pct.toFixed(pct % 1 ? 1 : 0) + '%';
+}
+
+function chartValue(row = {}) {
+  return Math.max(0, Number(row.distance_cm || row.total || row.total_amount || row.actions || row.kills || row.deaths || row.count || row.value || 0));
 }
 function renderFacts(facts, targetId = 'funFacts') {
   const icons = ['📈', '⚖', '❤️', '🕘'];
   const el = $(targetId);
   if (!el) return;
-  el.innerHTML = (facts.length ? facts : ['No stats yet.']).map((f, i) => `<div class="fact"><strong>${icons[i % icons.length]}</strong> ${esc(f)}</div>`).join('');
+  if (!facts.length) {
+    el.innerHTML = '<div class="fact empty-fact"><strong>⌛</strong> No stats recorded yet. Mine, place or explore for a bit, then refresh this panel.</div>';
+    return;
+  }
+  el.innerHTML = facts.map((f, i) => `<div class="fact"><strong>${icons[i % icons.length]}</strong> ${esc(f)}</div>`).join('');
 }
 function renderTrend(rows) {
   const el = $('trendChart');
@@ -1436,11 +1505,11 @@ function renderTrend(rows) {
     el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
       <line class="axis" x1="${p}" y1="${baseY}" x2="${w - p}" y2="${baseY}"/>
       <line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${baseY}"/>
-      <rect class="trend-bar-mined" x="${cx - barW - 8}" y="${baseY - minedH}" width="${barW}" height="${minedH}" rx="8"/>
-      <rect class="trend-bar-placed" x="${cx + 8}" y="${baseY - placedH}" width="${barW}" height="${placedH}" rx="8"/>
-      <text x="${cx - barW / 2 - 8}" y="${baseY - minedH - 10}" fill="#00f5ff" font-size="12" font-weight="800" text-anchor="middle">${fmtFull(mined)}</text>
-      <text x="${cx + barW / 2 + 8}" y="${baseY - placedH - 10}" fill="#ff006e" font-size="12" font-weight="800" text-anchor="middle">${fmtFull(placed)}</text>
-      <text x="${cx}" y="${h - 6}" fill="#687084" font-size="12" text-anchor="middle">${esc(r.label || 'Today')}</text>
+      <rect class="trend-bar-mined" x="${cx - barW - 8}" y="${baseY - minedH}" width="${barW}" height="${minedH}" rx="0"/>
+      <rect class="trend-bar-placed" x="${cx + 8}" y="${baseY - placedH}" width="${barW}" height="${placedH}" rx="0"/>
+      <text x="${cx - barW / 2 - 8}" y="${baseY - minedH - 10}" fill="#5BA033" font-size="12" font-weight="800" text-anchor="middle">${fmtFull(mined)}</text>
+      <text x="${cx + barW / 2 + 8}" y="${baseY - placedH - 10}" fill="#C0392B" font-size="12" font-weight="800" text-anchor="middle">${fmtFull(placed)}</text>
+      <text x="${cx}" y="${h - 6}" fill="#A8A8A8" font-size="12" text-anchor="middle">${esc(r.label || 'Today')}</text>
     </svg>`;
     return;
   }
@@ -1457,7 +1526,7 @@ function renderTrend(rows) {
     <path class="line-placed" d="${path('placed')}"/>
     ${points('mined', 'point-mined', -2)}
     ${points('placed', 'point-placed', 2)}
-    ${rows.map((r, i) => `<text x="${x(i)}" y="${h - 6}" fill="#687084" font-size="11" text-anchor="middle">${esc(r.label || '')}</text>`).join('')}
+    ${rows.map((r, i) => `<text x="${x(i)}" y="${h - 6}" fill="#A8A8A8" font-size="11" text-anchor="middle">${esc(r.label || '')}</text>`).join('')}
   </svg>`;
 }
 function renderBlocks(blocks) {
@@ -1551,7 +1620,7 @@ function renderBiomeGrid(id, visited = []) {
   const el = $(id);
   if (!el) return;
   const visitedMap = {};
-  for (const b of visited) { visitedMap[b.biome_name] = b; }
+  for (const b of visited) { visitedMap[biomeKey(b.biome_name || b.name || b.display_name)] = b; }
   const dimOrder = ['Overworld', 'Nether', 'End'];
   const byDim = {};
   for (const b of ALL_BIOMES) {
@@ -1563,13 +1632,17 @@ function renderBiomeGrid(id, visited = []) {
     const cards = byDim[dim].map(b => {
       const v = visitedMap[b.key];
       const cls = v ? 'unlocked' : 'locked';
-      return `<article class="biome-card ${cls}" title="${esc(b.name)}${v ? ' · ' + fmtDistItem(v.distance_cm || 0) : ''}"><span class="biome-emoji">${esc(b.emoji)}</span><span>${esc(b.name)}</span>${v ? `<small>${fmtDistItem(v.distance_cm || 0)}</small>` : ''}</article>`;
+      return `<article class="biome-card ${cls}" title="${esc(b.name)}${v ? ' · ' + fmtDistFull(v.distance_cm || 0) : ' · not visited'}"><span class="biome-emoji">${esc(b.emoji)}</span><span>${esc(b.name)}</span>${v ? `<small>${fmtDistFull(v.distance_cm || 0)}</small>` : '<small>Not visited</small>'}</article>`;
     }).join('');
     const dimLabel = dim === 'Overworld' ? '🌍 Overworld' : dim === 'Nether' ? '🔥 Nether' : dim === 'End' ? '🟣 The End' : dim;
     const visitedCount = byDim[dim].filter(b => visitedMap[b.key]).length;
     return `<div class="biome-dim-group"><h3>${dimLabel} <small>${visitedCount}/${byDim[dim].length}</small></h3><div class="biome-grid-inner">${cards}</div></div>`;
   }).join('');
   el.innerHTML = sections || '<div class="empty">No biome data available.</div>';
+}
+
+function biomeKey(value = '') {
+  return String(value || '').toLowerCase().replace(/^minecraft:/, '').replace(/[^a-z0-9_]/g, '_');
 }
 
 const ALL_BIOMES = [
@@ -1614,10 +1687,11 @@ function renderMoveDonut(donutId, legendId, items, labelKey = 'display_name') {
 }
 
 function top10Others(items) {
-  if (!items || items.length <= 11) return items;
-  const top = items.slice(0, 10);
-  const othersDist = items.slice(10).reduce((s, i) => s + (i.distance_cm || 0), 0);
-  const totalDist = items.reduce((s, i) => s + (i.distance_cm || 0), 0);
+  const sorted = [...(items || [])].sort((a, b) => (b.distance_cm || 0) - (a.distance_cm || 0));
+  if (sorted.length <= 11) return sorted;
+  const top = sorted.slice(0, 10);
+  const othersDist = sorted.slice(10).reduce((s, i) => s + (i.distance_cm || 0), 0);
+  const totalDist = sorted.reduce((s, i) => s + (i.distance_cm || 0), 0);
   if (othersDist > 0) {
     top.push({display_name:'Other biomes',distance_cm:othersDist,percent:totalDist>0?Math.round(othersDist*1000/totalDist)/10:0});
   }

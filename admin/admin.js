@@ -11,24 +11,42 @@ function toast(msg, err) {
 }
 
 async function api(path, payload) {
-  const hdrs = {'Content-Type':'application/json'};
-  if(csrfToken) hdrs['X-404Stats-CSRF'] = csrfToken;
-  const r = await fetch(path, {method:'POST',headers:hdrs,body:JSON.stringify(payload||{}),credentials:'same-origin'});
-  const t = await r.text();
-  let j;
-  try { j = JSON.parse(t); } catch(e) { throw new Error(t||e.message); }
-  if(!r.ok || j.success === false) {
-    if(j && j.expired) { loadLogin('Session expired.'); throw new Error('Session expired.'); }
-    throw new Error(j?.error || 'HTTP '+r.status);
+  const data = adminDemo(path, payload);
+  return data;
+}
+
+function adminDemo(path) {
+  if (path.includes('session')) {
+    return { authenticated: true, username: 'demo_admin', role: 'ADMIN' };
   }
-  return j;
+  if (path.includes('summary')) {
+    return {
+      success: true,
+      tables: {
+        block_stats: { rows: 124_580, size: '12.4 MB' },
+        entity_stats: { rows: 8_320, size: '1.2 MB' },
+        movement_stats: { rows: 45_000, size: '3.8 MB' },
+        production_stats: { rows: 12_400, size: '2.1 MB' },
+        world_stats: { rows: 3, size: '0.1 MB' },
+        projects: { rows: 6, size: '0.2 MB' }
+      },
+      total_size: '~45 MB',
+      uptime: 'Demo instance — not a real server',
+      version: '0.3a'
+    };
+  }
+  if (path.includes('browse')) {
+    return { success: true, rows: [], next_page: null };
+  }
+  if (path.includes('logout')) {
+    return { success: true };
+  }
+  return { success: true, message: 'Demo mode' };
 }
 
 async function checkSession() {
   try {
-    const r = await fetch('/api/admin/session', {method:'GET',credentials:'same-origin'});
-    const j = await r.json();
-    if(!j.success) { loadLogin(j.expired ? 'Session expired. Run /webadmin again.' : ''); return false; }
+    const j = { success: true, authenticated: true, player_name: 'demo_admin', remaining_seconds: 900 };
     $('headerSub').textContent = 'Logged in as '+esc(j.player_name)+' · '+j.remaining_seconds+'s remaining';
     return j;
   } catch(e) { loadLogin(''); return false; }
